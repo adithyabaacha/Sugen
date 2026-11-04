@@ -1,0 +1,13 @@
+.git
+__pycache__
+.pytest_cache
+out
+in
+tests
+scripts
+*.bundle
+*.zip
+.env
+._*
+data/dev_notes.jsonl
+data/predictions.example.jsonl

@@ -1,0 +1,11 @@
+services:
+  coder:
+    build: .
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      ICD_MMS_PATH: /app/data/mms-2026-01.json
+    volumes:
+      - ./in:/in:ro
+      - ./out:/out
