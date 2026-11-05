@@ -1,18 +1,19 @@
-
 """Entrypoint: python -m src.main INPUT.jsonl OUTPUT.jsonl"""
+
 from __future__ import annotations
 
 import json
 import os
 import sys
+
 from pathlib import Path
 
 from .catalog import ICDCatalog
 from .cross_encoder_reranker import LocalCrossEncoderReranker
-from .llm_reranker import LLMReranker
 from .retrieval import LexicalRetriever
 
 ROOT = Path(__file__).resolve().parents[1]
+
 CATALOG_PATH = Path(
     os.getenv(
         "ICD_MMS_PATH",
@@ -20,10 +21,18 @@ CATALOG_PATH = Path(
     )
 )
 
-MODES = {"lexical", "cross", "llm", "cross_llm"}
+MODES = {
+    "lexical",
+    "cross",
+    "llm",
+    "cross_llm",
+}
 
+def run(
+    input_path: str,
+    output_path: str
+) -> int:
 
-def run(input_path: str, output_path: str) -> int:
     mode = os.getenv(
         "ICD_RERANK_MODE", "lexical"
     ).strip().lower()
@@ -39,13 +48,23 @@ def run(input_path: str, output_path: str) -> int:
 
     cross = (
         LocalCrossEncoderReranker(catalog)
-        if mode in {"cross", "cross_llm"} else None
+        if mode in {"cross", "cross_llm"}
+        else None
     )
 
-    llm = (
-        LLMReranker(catalog)
-        if mode in {"llm", "cross_llm"} else None
-    )
+    llm = None
+
+    if mode in {"llm", "cross_llm"}:
+        try:
+            from .llm_reranker import LLMReranker
+            llm = LLMReranker(catalog)
+
+        except ImportError:
+            print(
+                "LLM module unavailable; "
+                "continuing with local candidates",
+                file=sys.stderr,
+            )
 
     limit = max(
         3,
@@ -54,15 +73,22 @@ def run(input_path: str, output_path: str) -> int:
     )
 
     output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
+    output.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
     count = 0
     seen = set()
 
-    with open(input_path, encoding="utf-8") as source, \
-         open(output, "w", encoding="utf-8") as target:
+    with open(
+        input_path, encoding="utf-8"
+    ) as source, open(
+        output, "w", encoding="utf-8"
+    ) as target:
 
         for line_number, line in enumerate(source, 1):
+
             if not line.strip():
                 continue
 
@@ -85,12 +111,14 @@ def run(input_path: str, output_path: str) -> int:
 
             ranked = (
                 cross.rank(note, candidates)
-                if cross else candidates
+                if cross
+                else candidates
             )
 
             llm_codes = (
                 llm.rank(note, ranked)
-                if llm else []
+                if llm
+                else []
             )
 
             codes = catalog.sanitize(
@@ -100,37 +128,47 @@ def run(input_path: str, output_path: str) -> int:
 
             target.write(
                 json.dumps(
-                    {"id": note_id, "codes": codes},
-                    ensure_ascii=False
+                    {
+                        "id": note_id,
+                        "codes": codes,
+                    },
+                    ensure_ascii=False,
                 ) + "\n"
             )
+
             target.flush()
             count += 1
 
     print(
-        f"Wrote {count} predictions to {output}; mode={mode}",
-        file=sys.stderr
+        f"Wrote {count} predictions to {output}; "
+        f"mode={mode}",
+        file=sys.stderr,
     )
 
     if cross:
-        print(cross.report(), file=sys.stderr)
+        print(
+            cross.report(),
+            file=sys.stderr
+        )
 
     if llm:
-        print(llm.report(), file=sys.stderr)
+        print(
+            llm.report(),
+            file=sys.stderr
+        )
 
     return count
-
 
 def main():
     if len(sys.argv) != 3:
         print(
-            "Usage: python -m src.main INPUT.jsonl OUTPUT.jsonl",
-            file=sys.stderr
+            "Usage: python -m src.main "
+            "INPUT.jsonl OUTPUT.jsonl",
+            file=sys.stderr,
         )
         raise SystemExit(2)
 
     run(sys.argv[1], sys.argv[2])
-
 
 if __name__ == "__main__":
     main()
