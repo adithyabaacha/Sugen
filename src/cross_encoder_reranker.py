@@ -1,4 +1,3 @@
-
 """Local CPU cross-encoder reranker. No runtime model downloads."""
 from __future__ import annotations
 

@@ -1,6 +1,4 @@
 
-"""No-network tests for the hardened ICD-11 pipeline."""
-
 import json
 from pathlib import Path
 from types import SimpleNamespace

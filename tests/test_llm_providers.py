@@ -1,5 +1,3 @@
-"""Provider selection and offline fallback tests."""
-
 import json
 
 from pathlib import Path

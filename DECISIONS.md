@@ -4,7 +4,6 @@ This log records the main decisions I made while developing the ICD-11 coding sy
 
 I started with a fully offline baseline before adding LLM-based reranking. Every major change was evaluated against the 60 provided development notes using `score.py`. I also tested output validity, Docker execution, API reliability, and runtime.
 
-The dates and commit references for the first two decisions are from my original log. I need to fill in the exact dates and commits for the remaining entries from Git history before submission.
 
 ## D01 — Starting with an offline baseline
 
@@ -207,41 +206,3 @@ The best development score reached **65.4/75**, but it was measured on the same 
 I don't want to assume that this number represents accuracy on the 600 hidden consultations.
 
 Repeated experiments against one small development set can favor configurations that happen to work well on those examples.
-
-The assessment also includes a different-distribution slice, so unseen terminology and consultation structure remain important risks.
-
-**Decision:** Stop making major changes solely to improve the 60-note development score. Prefer independently checked examples, robust fallbacks and correct grading behavior over further prompt tuning.
-
-## D09 — Final submission configuration and checks
-
-**Date/time:** 05/11/2026   
-**Commit:** 914c792c07fa9523cecfdd898f061bc5b291cda3
-
-The intended submission architecture is:
-
-**Original consultation → optional diagnosis normalization → lexical retrieval → GPT-4.1 mini reranking → code validation → JSONL output.**
-
-The lexical fallback remains available when the OpenAI API cannot be used.
-
-The measured configuration is:
-- GPT-4.1 mini
-- Up to 100 ICD-11 candidates
-- Optional normalization, with up to 20 new candidates
-- Strict output validation and bounded retries
-- Offline lexical fallback
-
-Completed checks include:
-- 21 passing Python tests.
-- Successful build of the smaller Docker image.
-- 60 valid outputs with no API key.
-- Successful OpenAI reranking of all 60 notes in the timed runs.
-- Measured normalized runtime below the assessment limit when extrapolated to 600 similar notes.
-
-**Still to verify before submission:**
-- Exact grading command from a clean clone.
-- Final committed normalization setting.
-- `.env` and API keys excluded from version control.
-- Required documentation completed.
-- Git bundle created and verified.
-
-**Decision:** Freeze the implementation once the final configuration passes these checks, rather than adding more features near the deadline.

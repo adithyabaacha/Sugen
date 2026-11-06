@@ -1,4 +1,3 @@
-
 """Optional LLM translation/diagnosis search hint for unseen note styles.
 
 Disabled by default to preserve the 65.0/75 measured configuration.

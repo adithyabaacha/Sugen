@@ -1,4 +1,3 @@
-
 """Download the cross-encoder during Docker build."""
 from pathlib import Path
 from sentence_transformers import CrossEncoder

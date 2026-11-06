@@ -1,6 +1,3 @@
-
-"""Tests for the local cross-encoder reranker."""
-
 import json
 from pathlib import Path
 
