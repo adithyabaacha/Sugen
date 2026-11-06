@@ -1,16 +1,18 @@
 """Entrypoint: python -m src.main INPUT.jsonl OUTPUT.jsonl"""
-
 from __future__ import annotations
 
 import json
 import os
 import sys
-
 from pathlib import Path
 
 from .catalog import ICDCatalog
 from .cross_encoder_reranker import LocalCrossEncoderReranker
 from .retrieval import LexicalRetriever
+from .note_normalizer import (
+    NoteNormalizer,
+    merge_retrieval_lists
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -21,26 +23,18 @@ CATALOG_PATH = Path(
     )
 )
 
-MODES = {
-    "lexical",
-    "cross",
-    "llm",
-    "cross_llm",
-}
+MODES = {"lexical", "cross", "llm", "cross_llm"}
 
-def run(
-    input_path: str,
-    output_path: str
-) -> int:
 
+def run(input_path: str, output_path: str) -> int:
     mode = os.getenv(
-        "ICD_RERANK_MODE", "lexical"
+        "ICD_RERANK_MODE", "llm"
     ).strip().lower()
 
     if mode not in MODES:
         raise ValueError(
             f"Invalid ICD_RERANK_MODE={mode!r}; "
-            f"choose one of {sorted(MODES)}"
+            f"choose from {sorted(MODES)}"
         )
 
     catalog = ICDCatalog(CATALOG_PATH)
@@ -58,18 +52,35 @@ def run(
         try:
             from .llm_reranker import LLMReranker
             llm = LLMReranker(catalog)
-
         except ImportError:
             print(
-                "LLM module unavailable; "
-                "continuing with local candidates",
-                file=sys.stderr,
+                "LLM module unavailable; using lexical fallback",
+                file=sys.stderr
             )
+
+    normalizer = (
+        NoteNormalizer()
+        if llm is not None
+        else None
+    )
 
     limit = max(
         3,
         cross.candidate_limit if cross else 3,
-        llm.candidate_limit if llm else 3,
+        llm.candidate_limit if llm else 3
+    )
+
+    normalized_quota = max(
+        0,
+        min(
+            limit,
+            int(
+                os.getenv(
+                    "ICD_NORMALIZE_NEW_CANDIDATES",
+                    "20"
+                )
+            )
+        )
     )
 
     output = Path(output_path)
@@ -78,8 +89,7 @@ def run(
         exist_ok=True
     )
 
-    count = 0
-    seen = set()
+    count, seen = 0, set()
 
     with open(
         input_path, encoding="utf-8"
@@ -88,7 +98,6 @@ def run(
     ) as target:
 
         for line_number, line in enumerate(source, 1):
-
             if not line.strip():
                 continue
 
@@ -105,9 +114,25 @@ def run(
             note = row.get("text", "")
 
             candidates = retriever.rank(
-                note,
-                limit=limit
+                note, limit=limit
             )
+
+            # Optional generalization stage.
+            # Disabled by default.
+            if normalizer is not None:
+                search_hint = normalizer.normalize(note)
+
+                if search_hint:
+                    normalized_candidates = retriever.rank(
+                        search_hint,
+                        limit=limit
+                    )
+
+                    candidates = merge_retrieval_lists(
+                        candidates,
+                        normalized_candidates,
+                        normalized_quota
+                    )
 
             ranked = (
                 cross.rank(note, candidates)
@@ -130,45 +155,42 @@ def run(
                 json.dumps(
                     {
                         "id": note_id,
-                        "codes": codes,
+                        "codes": codes
                     },
-                    ensure_ascii=False,
+                    ensure_ascii=False
                 ) + "\n"
             )
-
             target.flush()
             count += 1
 
     print(
-        f"Wrote {count} predictions to {output}; "
-        f"mode={mode}",
-        file=sys.stderr,
+        f"Wrote {count} predictions to {output}; mode={mode}",
+        file=sys.stderr
     )
 
     if cross:
-        print(
-            cross.report(),
-            file=sys.stderr
-        )
+        print(cross.report(), file=sys.stderr)
 
     if llm:
-        print(
-            llm.report(),
-            file=sys.stderr
-        )
+        print(llm.report(), file=sys.stderr)
+
+    if normalizer and normalizer.mode != "off":
+        print(normalizer.report(), file=sys.stderr)
 
     return count
+
 
 def main():
     if len(sys.argv) != 3:
         print(
             "Usage: python -m src.main "
             "INPUT.jsonl OUTPUT.jsonl",
-            file=sys.stderr,
+            file=sys.stderr
         )
         raise SystemExit(2)
 
     run(sys.argv[1], sys.argv[2])
+
 
 if __name__ == "__main__":
     main()

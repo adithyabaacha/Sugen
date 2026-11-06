@@ -2,5 +2,3 @@ numpy==1.26.4
 scipy==1.14.1
 scikit-learn==1.5.2
 openai==3.42.1
-sentence-transformers==5.2.3
-transformers==4.51.3

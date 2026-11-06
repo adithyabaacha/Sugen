@@ -9,24 +9,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# CPU-only PyTorch
-RUN pip install --no-cache-dir torch==2.6.0 \
-    --index-url https://download.pytorch.org/whl/cpu
-
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download and save model during build
-COPY scripts/download_cross_encoder.py \
-     ./scripts/download_cross_encoder.py
-
-RUN python scripts/download_cross_encoder.py
-
-# Disable runtime downloads
-ENV HF_HUB_OFFLINE=1 \
-    TRANSFORMERS_OFFLINE=1 \
-    ICD_CE_MODEL_PATH=/app/models/cross_encoder
-
+# The ICD-11 catalog ships with the image.
+# No model downloads during grading.
 COPY src/ ./src/
 COPY data/mms-2026-01.json ./data/mms-2026-01.json
 
